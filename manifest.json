@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.solkkku.audio-switcher",
   "name": "Sound Switcher",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "solkkku",
   "license": "MIT",
-  "description": "Switch between audio profiles (output + input) via hotkeys or a bar button.",
+  "description": "Switch between audio profiles (output + input) via hotkeys or a bar button, with automatic fallback when a device disconnects.",
   "kinds": ["service", "bar-widget", "panel"],
   "keepLoaded": true,
   "entryPoints": {

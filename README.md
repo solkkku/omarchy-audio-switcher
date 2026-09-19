@@ -10,8 +10,8 @@ An [Omarchy](https://omarchy.org/) Quattro shell plugin that switches between **
 - **Per-profile hotkeys** — jump straight to a profile.
 - **Mute indicators** — profile rows show sound and microphone mute state; click to toggle.
 - **Notifications** — optional; bottom-center, top-right, or off.
-- **Persistence** — the last active profile is restored after a reboot.
-- **Fallback profile** — optionally switch to a chosen profile automatically when the active profile's output device disconnects, instead of leaving it to PipeWire/WirePlumber's own priority-based routing.
+- **Persistence** — the profile you last chose is restored after a reboot.
+- **Fallback profile** — optionally switch to a chosen profile automatically when the active profile's output device disconnects (instead of leaving it to PipeWire/WirePlumber's own priority-based routing), and switch back automatically once the original device reconnects.
 
 ## Requirements
 
