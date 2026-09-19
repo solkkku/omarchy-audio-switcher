@@ -23,6 +23,7 @@ Panel {
   readonly property string micMuteHotkey: service ? service.micMuteHotkey : ""
   readonly property string outputMuteHotkey: service ? service.outputMuteHotkey : ""
   readonly property string notificationPosition: service ? service.notificationPosition : "bottom-center"
+  readonly property string fallbackProfileName: service ? service.fallbackProfileName : ""
   readonly property var outputOptions: service ? service.outputOptions : []
   readonly property var inputOptions: service ? service.inputOptions : []
   readonly property string currentProfileName: service ? service.currentProfileName : ""
@@ -712,6 +713,53 @@ Panel {
                 onClicked: {
                   var svc = root.resolveService()
                   if (svc) svc.setNotificationPosition("bottom-center")
+                }
+              }
+            }
+
+            PanelSeparator { foreground: root.bar.foreground }
+
+            SectionHeader {
+              iconGlyph: "󰑖"
+              title: "FALLBACK PROFILE"
+            }
+
+            Text {
+              width: parent.width
+              textFormat: Text.PlainText
+              text: "Switched to automatically if the active profile's device disconnects."
+              color: Qt.darker(root.bar.foreground, 1.6)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+
+            Flow {
+              width: parent.width
+              spacing: Style.space(6)
+
+              Button {
+                text: "None"
+                foreground: root.bar.foreground
+                selected: root.fallbackProfileName === ""
+                onClicked: {
+                  var svc = root.resolveService()
+                  if (svc) svc.setFallbackProfile("")
+                }
+              }
+
+              Repeater {
+                model: root.profiles
+
+                Button {
+                  required property var modelData
+                  text: String(modelData.name || "")
+                  foreground: root.bar.foreground
+                  selected: root.fallbackProfileName === modelData.name
+                  onClicked: {
+                    var svc = root.resolveService()
+                    if (svc) svc.setFallbackProfile(modelData.name)
+                  }
                 }
               }
             }
