@@ -378,14 +378,15 @@ Panel {
   }
 
   // ---- bar glyph ----
+  // Use the active profile's own configured icon rather than guessing from
+  // the raw PipeWire node name (which rarely contains words like
+  // "headphone"/"bluetooth"/"hdmi" and left the bar icon mismatched with
+  // the icon picked in the profile editor).
   function outputGlyph() {
-    var name = service ? String(service.defaultSinkName || "") : ""
-    if (!name) return "󰓃"
-    var lower = name.toLowerCase()
-    if (lower.indexOf("headphone") !== -1 || lower.indexOf("headset") !== -1) return "󰋋"
-    if (lower.indexOf("bluetooth") !== -1) return "󰂯"
-    if (lower.indexOf("hdmi") !== -1 || lower.indexOf("display") !== -1) return "󰍹"
-    return "󰓃"
+    if (!service) return defaultIcon
+    var idx = service.currentProfileIndex()
+    if (idx >= 0 && profiles[idx] && profiles[idx].icon) return profiles[idx].icon
+    return defaultIcon
   }
 
   implicitWidth: button.implicitWidth
