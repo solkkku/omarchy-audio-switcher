@@ -46,15 +46,18 @@ Item {
   readonly property string bindingsWriter: decodeURIComponent(String(Qt.resolvedUrl("bin/write-managed-bindings.py")).replace(/^file:\/\//, ""))
   readonly property string setsidBinary: "/usr/bin/setsid"
   readonly property string killBinary: "/usr/bin/kill"
+  readonly property string hyprctlBinary: "/usr/bin/hyprctl"
 
   // The environment handed to helpers is closed (clearEnvironment) and then
   // populated with only what they need: a fixed PATH for their own tool
-  // lookups, HOME for user-scoped state, and XDG_RUNTIME_DIR for the PipeWire
-  // and D-Bus sockets.
+  // lookups, HOME for user-scoped state, XDG_RUNTIME_DIR for the PipeWire and
+  // D-Bus sockets, and the Hyprland instance signature so hyprctl can reach
+  // the running compositor.
   readonly property var helperEnvironment: ({
     "PATH": "/usr/local/bin:/usr/bin:/bin",
     "HOME": home,
-    "XDG_RUNTIME_DIR": String(Quickshell.env("XDG_RUNTIME_DIR") || "")
+    "XDG_RUNTIME_DIR": String(Quickshell.env("XDG_RUNTIME_DIR") || ""),
+    "HYPRLAND_INSTANCE_SIGNATURE": String(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "")
   })
 
   // ---------------- config (read from shell.json) ----------------
@@ -881,6 +884,53 @@ Item {
     return 'Hotkey already used by "' + owner.name + '".'
   }
 
+  // ---------------- suspend our own binds while capturing ----------------
+  // While the panel is capturing a new combination, a press of a key this
+  // plugin already owns would otherwise fire its bind and switch the profile
+  // underneath the capture. So every managed combo is unbound for the duration
+  // and the bindings are re-applied from the (unchanged) config file on end.
+  property bool captureSuspended: false
+
+  function managedCombos() {
+    var combos = []
+    for (var i = 0; i < profiles.length; i++) {
+      var key = sanitizeHotkey(profiles[i].hotkey)
+      if (key) combos.push(key)
+    }
+    var extras = [previousHotkey, cycleHotkey, micMuteHotkey, outputMuteHotkey]
+    for (var j = 0; j < extras.length; j++) {
+      var combo = sanitizeHotkey(extras[j])
+      if (combo) combos.push(combo)
+    }
+    return combos
+  }
+
+  // One eval call unbinds the whole set at once, so the window in which a
+  // managed bind could still fire is as short as possible. The script is built
+  // only from sanitized combos rendered through luaString(), so it cannot carry
+  // anything but a fixed hl.unbind("...") call per combo.
+  function beginHotkeyCapture() {
+    if (captureSuspended) return "ok"
+    captureSuspended = true
+    var combos = managedCombos()
+    if (combos.length === 0) return "ok"
+    var script = []
+    for (var i = 0; i < combos.length; i++)
+      script.push("hl.unbind(" + luaString(combos[i]) + ")")
+    runHelper([hyprctlBinary, "eval", script.join("\n")], "suspend binds")
+    return "ok"
+  }
+
+  // Restore from the config file: reloading clears the runtime unbinds and
+  // re-applies exactly what bindings.lua specifies (including any combo the
+  // user just assigned).
+  function endHotkeyCapture() {
+    if (!captureSuspended) return "ok"
+    captureSuspended = false
+    runHelper([hyprctlBinary, "reload"], "restore binds")
+    return "ok"
+  }
+
   function setCycleHotkey(combo) {
     if (hotkeyConflictOwner(combo, -1, "cycle")) return "duplicate"
     cycleHotkey = sanitizeHotkey(combo)
@@ -1065,6 +1115,8 @@ Item {
     function setNotificationPosition(pos: string): string { return root.setNotificationPosition(pos) }
     function setFallbackProfile(name: string): string { return root.setFallbackProfile(name) }
     function hotkeyConflict(combo: string, index: string, global: string): string { return root.hotkeyConflictMessage(combo, index, global) }
+    function beginHotkeyCapture(): string { return root.beginHotkeyCapture() }
+    function endHotkeyCapture(): string { return root.endHotkeyCapture() }
     function addProfile(name: string, output: string, input: string, hotkey: string, icon: string): string { return root.addProfile(name, output, input, hotkey, icon) }
     function updateProfile(index: string, name: string, output: string, input: string, hotkey: string, icon: string): string { return root.updateProfile(index, name, output, input, hotkey, icon) }
     function removeProfile(index: string): string { return root.removeProfile(index) }

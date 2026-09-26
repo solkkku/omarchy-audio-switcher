@@ -89,6 +89,9 @@ Panel {
 
   onOpenedChanged: {
     if (!opened) {
+      // Never leave our own binds suspended if the panel is dismissed mid-capture.
+      var svc = resolveService()
+      if (svc) svc.endHotkeyCapture()
       dismissResetTimer.restart()
     } else {
       dismissResetTimer.stop()
@@ -267,6 +270,10 @@ Panel {
 
   // ---- hotkey capture ----
   function startCapture(target) {
+    // Suspend this plugin's own binds first, so pressing a combination it
+    // already owns cannot switch profiles underneath the capture.
+    var svc = resolveService()
+    if (svc) svc.beginHotkeyCapture()
     capturing = true
     captureTarget = target
     captureWarning = ""
@@ -274,6 +281,8 @@ Panel {
   }
 
   function cancelCapture() {
+    var svc = resolveService()
+    if (svc) svc.endHotkeyCapture()
     capturing = false
     captureTarget = ""
     captureWarning = ""

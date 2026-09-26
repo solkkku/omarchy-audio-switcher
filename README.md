@@ -9,6 +9,7 @@ An [Omarchy](https://omarchy.org/) Quattro shell plugin that switches between **
 - **Global keybinds** — assign *Previous profile*, *Next profile*, *Toggle sound mute*, and *Toggle mic mute*.
 - **Per-profile hotkeys** — jump straight to a profile.
 - **Duplicate protection** — a hotkey already used by another profile (or a global shortcut) is refused, and the form names the profile or shortcut that owns it.
+- **Capture-safe** — while assigning a hotkey, the plugin's own shortcuts are temporarily suspended, so pressing one cannot switch profiles underneath the capture.
 - **Mute indicators** — profile rows show sound and microphone mute state; click to toggle.
 - **Notifications** — optional; bottom-center, top-right, or off.
 - **Persistence** — the profile you last chose is restored after a reboot.
