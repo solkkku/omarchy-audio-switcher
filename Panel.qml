@@ -41,6 +41,10 @@ Panel {
   // ---- hotkey capture state ----
   property bool capturing: false
   property string captureTarget: ""
+  // Transient warning shown under an Options-page row when a captured combo
+  // collides with something else and the service refuses to apply it.
+  property string captureWarning: ""
+  property string captureWarningTarget: ""
 
   // ---- long-press drag reorder state ----
   property int draggingIndex: -1
@@ -66,8 +70,17 @@ Panel {
     return false
   }
 
+  // Hotkey conflict for the form. `editingIndex` is excluded, so a profile
+  // never clashes with itself while editing; the warning names whichever
+  // profile or global shortcut already owns the combo.
+  readonly property string formHotkeyWarning: service
+    ? service.hotkeyConflictMessage(formHotkey, editingIndex, "")
+    : ""
+  readonly property bool formHotkeyDuplicate: formHotkeyWarning !== ""
+
   readonly property bool formComplete: formName.trim() !== ""
-    && formOutput !== "" && formHotkey !== "" && formIcon !== "" && !nameDuplicate
+    && formOutput !== "" && formHotkey !== "" && formIcon !== ""
+    && !nameDuplicate && !formHotkeyDuplicate
 
   function resolveService() {
     if (!service && bar && bar.shell) service = bar.shell.serviceFor("io.github.solkkku.audio-switcher")
@@ -256,30 +269,39 @@ Panel {
   function startCapture(target) {
     capturing = true
     captureTarget = target
+    captureWarning = ""
+    captureWarningTarget = ""
   }
 
   function cancelCapture() {
     capturing = false
     captureTarget = ""
+    captureWarning = ""
+    captureWarningTarget = ""
   }
 
   function applyCaptured(combo) {
-    if (captureTarget === "cycle") {
-      var svc = resolveService()
-      if (svc) svc.setCycleHotkey(combo)
-    } else if (captureTarget === "previous") {
-      var svc2 = resolveService()
-      if (svc2) svc2.setPreviousHotkey(combo)
-    } else if (captureTarget === "micmute") {
-      var svc3 = resolveService()
-      if (svc3) svc3.setMicMuteHotkey(combo)
-    } else if (captureTarget === "outmute") {
-      var svc4 = resolveService()
-      if (svc4) svc4.setOutputMuteHotkey(combo)
-    } else if (captureTarget === "form") {
+    var target = captureTarget
+    var svc = resolveService()
+    var rejected = false
+    if (target === "cycle") {
+      if (svc && svc.setCycleHotkey(combo) === "duplicate") rejected = true
+    } else if (target === "previous") {
+      if (svc && svc.setPreviousHotkey(combo) === "duplicate") rejected = true
+    } else if (target === "micmute") {
+      if (svc && svc.setMicMuteHotkey(combo) === "duplicate") rejected = true
+    } else if (target === "outmute") {
+      if (svc && svc.setOutputMuteHotkey(combo) === "duplicate") rejected = true
+    } else if (target === "form") {
+      // Keep the combo in the form; the live warning and disabled Save explain
+      // why it cannot be saved yet.
       formHotkey = combo
     }
     cancelCapture()
+    if (rejected && svc) {
+      captureWarning = svc.hotkeyConflictMessage(combo, -1, target)
+      captureWarningTarget = target
+    }
   }
 
   function clearHotkey(target) {
@@ -637,12 +659,14 @@ Panel {
               labelText: "Previous profile"
               value: root.previousHotkey
               captureId: "previous"
+              warningText: root.captureWarningTarget === "previous" ? root.captureWarning : ""
             }
 
             HotkeyAssignRow {
               labelText: "Next profile"
               value: root.cycleHotkey
               captureId: "cycle"
+              warningText: root.captureWarningTarget === "cycle" ? root.captureWarning : ""
             }
 
             PanelSeparator { foreground: root.bar.foreground }
@@ -658,6 +682,7 @@ Panel {
               labelText: "Toggle mute (active profile)"
               value: root.outputMuteHotkey
               captureId: "outmute"
+              warningText: root.captureWarningTarget === "outmute" ? root.captureWarning : ""
             }
 
             PanelSeparator { foreground: root.bar.foreground }
@@ -673,6 +698,7 @@ Panel {
               labelText: "Toggle mute (active profile)"
               value: root.micMuteHotkey
               captureId: "micmute"
+              warningText: root.captureWarningTarget === "micmute" ? root.captureWarning : ""
             }
 
             PanelSeparator { foreground: root.bar.foreground }
@@ -848,6 +874,7 @@ Panel {
               labelText: "Hotkey"
               value: root.formHotkey
               captureId: "form"
+              warningText: root.formHotkeyWarning
             }
 
             Text {
@@ -965,56 +992,73 @@ Panel {
     }
   }
 
-  component HotkeyAssignRow: Item {
+  component HotkeyAssignRow: Column {
     property string labelText: ""
     property string value: ""
     property string captureId: ""
     property color rowForeground: root.bar.foreground
+    property string warningText: ""
 
     width: parent.width
-    implicitHeight: Math.max(infoColumn.implicitHeight, actionButton.implicitHeight) + Style.space(4)
+    spacing: Style.space(2)
 
-    Column {
-      id: infoColumn
-      anchors.left: parent.left
-      anchors.right: actionButton.left
-      anchors.rightMargin: Style.space(8)
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: Style.space(2)
+    Item {
+      width: parent.width
+      implicitHeight: Math.max(infoColumn.implicitHeight, actionButton.implicitHeight) + Style.space(4)
 
-      Text {
-        width: parent.width
-        textFormat: Text.PlainText
-        text: labelText
-        color: rowForeground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
+      Column {
+        id: infoColumn
+        anchors.left: parent.left
+        anchors.right: actionButton.left
+        anchors.rightMargin: Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.space(2)
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: labelText
+          color: rowForeground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: value || "UNASSIGNED"
+          color: Qt.darker(rowForeground, 1.6)
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
       }
 
-      Text {
-        width: parent.width
-        textFormat: Text.PlainText
-        text: value || "UNASSIGNED"
-        color: Qt.darker(rowForeground, 1.6)
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
+      Button {
+        id: actionButton
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        foreground: rowForeground
+        text: (root.capturing && root.captureTarget === captureId)
+          ? "Press keys…"
+          : (value ? "Reassign" : "Assign")
+        onClicked: {
+          if (root.capturing && root.captureTarget === captureId) root.cancelCapture()
+          else root.startCapture(captureId)
+        }
       }
     }
 
-    Button {
-      id: actionButton
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      foreground: rowForeground
-      text: (root.capturing && root.captureTarget === captureId)
-        ? "Press keys…"
-        : (value ? "Reassign" : "Assign")
-      onClicked: {
-        if (root.capturing && root.captureTarget === captureId) root.cancelCapture()
-        else root.startCapture(captureId)
-      }
+    Text {
+      width: parent.width
+      visible: warningText !== ""
+      textFormat: Text.PlainText
+      text: warningText
+      color: root.bar ? root.bar.urgent : "#ff5555"
+      font.family: root.bar.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.WordWrap
     }
   }
 

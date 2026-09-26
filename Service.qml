@@ -834,25 +834,76 @@ Item {
     return isFinite(index) ? index : -1
   }
 
+  // Human labels for the four global (non-profile) shortcuts, used when
+  // reporting a hotkey that is already taken.
+  readonly property var globalHotkeyLabels: ({
+    "cycle": "Next profile",
+    "previous": "Previous profile",
+    "micmute": "Toggle mic mute",
+    "outmute": "Toggle sound mute"
+  })
+
+  function globalHotkeyValue(id) {
+    if (id === "cycle") return cycleHotkey
+    if (id === "previous") return previousHotkey
+    if (id === "micmute") return micMuteHotkey
+    if (id === "outmute") return outputMuteHotkey
+    return ""
+  }
+
+  // Owner of `combo`, or null when it is free. Profile hotkeys are matched
+  // against every profile except `exceptProfileIndex` (so a profile never
+  // conflicts with itself while editing); the global shortcuts are matched
+  // except `exceptGlobal`. Callers render the returned {kind, name}.
+  function hotkeyConflictOwner(combo, exceptProfileIndex, exceptGlobal) {
+    var key = sanitizeHotkey(combo)
+    if (!key) return null
+    var skip = parseIndex(exceptProfileIndex)
+    for (var i = 0; i < profiles.length; i++) {
+      if (i === skip) continue
+      if (sanitizeHotkey(profiles[i].hotkey) === key)
+        return { kind: "profile", name: String(profiles[i].name || "") || "Unnamed profile" }
+    }
+    var ids = ["cycle", "previous", "micmute", "outmute"]
+    for (var j = 0; j < ids.length; j++) {
+      if (ids[j] === exceptGlobal) continue
+      if (sanitizeHotkey(globalHotkeyValue(ids[j])) === key)
+        return { kind: "global", name: globalHotkeyLabels[ids[j]] }
+    }
+    return null
+  }
+
+  // Ready-to-render warning for a conflicting combo, or "" when it is free.
+  function hotkeyConflictMessage(combo, exceptProfileIndex, exceptGlobal) {
+    var owner = hotkeyConflictOwner(combo, exceptProfileIndex, exceptGlobal)
+    if (!owner) return ""
+    if (owner.kind === "global") return 'Hotkey already used by the "' + owner.name + '" shortcut.'
+    return 'Hotkey already used by "' + owner.name + '".'
+  }
+
   function setCycleHotkey(combo) {
+    if (hotkeyConflictOwner(combo, -1, "cycle")) return "duplicate"
     cycleHotkey = sanitizeHotkey(combo)
     writeConfig()
     return "ok"
   }
 
   function setPreviousHotkey(combo) {
+    if (hotkeyConflictOwner(combo, -1, "previous")) return "duplicate"
     previousHotkey = sanitizeHotkey(combo)
     writeConfig()
     return "ok"
   }
 
   function setMicMuteHotkey(combo) {
+    if (hotkeyConflictOwner(combo, -1, "micmute")) return "duplicate"
     micMuteHotkey = sanitizeHotkey(combo)
     writeConfig()
     return "ok"
   }
 
   function setOutputMuteHotkey(combo) {
+    if (hotkeyConflictOwner(combo, -1, "outmute")) return "duplicate"
     outputMuteHotkey = sanitizeHotkey(combo)
     writeConfig()
     return "ok"
@@ -866,8 +917,9 @@ Item {
 
   function addProfile(name, output, input, hotkey, icon) {
     if (profiles.length >= maxProfiles) return "limit"
-    var list = profiles.map(cloneProfile)
     var profile = sanitizeProfile({ name: name, output: output, input: input, hotkey: hotkey, icon: icon })
+    if (hotkeyConflictOwner(profile.hotkey, -1, "")) return "duplicate"
+    var list = profiles.map(cloneProfile)
     if (profilesChars(list) + profileChars(profile) > maxTotalChars) return "limit"
     list.push(profile)
     profiles = list
@@ -878,8 +930,10 @@ Item {
   function updateProfile(index, name, output, input, hotkey, icon) {
     var i = parseIndex(index)
     if (i < 0 || i >= profiles.length) return "unknown"
-    var list = profiles.map(cloneProfile)
     var profile = sanitizeProfile({ name: name, output: output, input: input, hotkey: hotkey, icon: icon })
+    // Exclude the profile being edited so keeping its own hotkey is allowed.
+    if (hotkeyConflictOwner(profile.hotkey, i, "")) return "duplicate"
+    var list = profiles.map(cloneProfile)
     var total = profilesChars(list) - profileChars(list[i]) + profileChars(profile)
     if (total > maxTotalChars) return "limit"
     list[i] = profile
@@ -1010,6 +1064,7 @@ Item {
     function setOutputMuteHotkey(combo: string): string { return root.setOutputMuteHotkey(combo) }
     function setNotificationPosition(pos: string): string { return root.setNotificationPosition(pos) }
     function setFallbackProfile(name: string): string { return root.setFallbackProfile(name) }
+    function hotkeyConflict(combo: string, index: string, global: string): string { return root.hotkeyConflictMessage(combo, index, global) }
     function addProfile(name: string, output: string, input: string, hotkey: string, icon: string): string { return root.addProfile(name, output, input, hotkey, icon) }
     function updateProfile(index: string, name: string, output: string, input: string, hotkey: string, icon: string): string { return root.updateProfile(index, name, output, input, hotkey, icon) }
     function removeProfile(index: string): string { return root.removeProfile(index) }
