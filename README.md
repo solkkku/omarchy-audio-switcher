@@ -14,6 +14,7 @@ An [Omarchy](https://omarchy.org/) Quattro shell plugin that switches between **
 - **Notifications** — optional; bottom-center, top-right, or off.
 - **Persistence** — the profile you last chose is restored after a reboot.
 - **Fallback profile** — optionally switch to a chosen profile automatically when the active profile's output device disconnects (instead of leaving it to PipeWire/WirePlumber's own priority-based routing), and switch back automatically once the original device reconnects.
+- **Version & update command** — the Options page shows the installed version and the command to update the plugin (click to copy). The plugin never checks for or applies updates itself; you decide when to run it.
 
 ## Requirements
 
@@ -80,9 +81,10 @@ Settings are stored inline on the plugin's entry in `~/.config/omarchy/shell.jso
   each field has a length cap, the profile list is capped at 32 entries and an
   aggregate character budget, and hotkeys must match a strict `TOKEN + TOKEN`
   grammar. Notification positions are constrained to a fixed set.
-- **No PATH lookups.** Omarchy helpers are invoked by absolute path with a
-  closed, minimal environment (`PATH`, `HOME`, `XDG_RUNTIME_DIR` only), so the
-  inherited shell environment cannot substitute a different binary.
+- **No PATH lookups.** Helpers are invoked by absolute path with a closed,
+  minimal environment (a fixed `PATH`, `HOME`, `XDG_RUNTIME_DIR` for the
+  PipeWire/D-Bus sockets, and `HYPRLAND_INSTANCE_SIGNATURE` for `hyprctl`), so
+  the inherited shell environment cannot substitute a different binary.
 - **Supervised helpers.** Each helper runs one job at a time in a dedicated
   process group (`setsid`) with a deadline: the watchdog terminates the whole
   group (so descendants that inherited the output pipes are reaped), then

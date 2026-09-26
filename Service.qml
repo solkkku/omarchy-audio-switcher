@@ -11,6 +11,11 @@ Item {
 
   property var shell: null
   property string omarchyPath: ""
+  // The shell publishes the plugin's public manifest (id, version, ...) to any
+  // service that declares a `manifest` property, the same way it injects
+  // omarchyPath.
+  property var manifest: null
+  readonly property string pluginVersion: manifest && manifest.version !== undefined ? String(manifest.version) : ""
 
   readonly property string home: Quickshell.env("HOME")
   readonly property string moduleName: "io.github.solkkku.audio-switcher"
@@ -931,6 +936,10 @@ Item {
     return "ok"
   }
 
+  // The update command shown (and copied) on the Options page. The plugin never
+  // checks for or applies updates itself - it only offers the command.
+  readonly property string updateCommand: "omarchy plugin update " + moduleName
+
   function setCycleHotkey(combo) {
     if (hotkeyConflictOwner(combo, -1, "cycle")) return "duplicate"
     cycleHotkey = sanitizeHotkey(combo)
@@ -1028,6 +1037,7 @@ Item {
       outputMuteHotkey: outputMuteHotkey,
       notificationPosition: notificationPosition,
       fallbackProfileName: fallbackProfileName,
+      pluginVersion: pluginVersion,
       profiles: profiles
     })
   }

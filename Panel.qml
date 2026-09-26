@@ -24,6 +24,9 @@ Panel {
   readonly property string outputMuteHotkey: service ? service.outputMuteHotkey : ""
   readonly property string notificationPosition: service ? service.notificationPosition : "bottom-center"
   readonly property string fallbackProfileName: service ? service.fallbackProfileName : ""
+  readonly property string pluginVersion: service ? service.pluginVersion : ""
+  readonly property string updateCommand: service ? service.updateCommand : ""
+  property bool updateCopied: false
   readonly property var outputOptions: service ? service.outputOptions : []
   readonly property var inputOptions: service ? service.inputOptions : []
   readonly property string currentProfileName: service ? service.currentProfileName : ""
@@ -152,6 +155,14 @@ Panel {
   function openSettings() {
     view = "settings"
     cancelCapture()
+  }
+
+  // Resets the transient "Copied!" state on the update command button.
+  Timer {
+    id: copiedResetTimer
+    interval: 2000
+    repeat: false
+    onTriggered: root.updateCopied = false
   }
 
   function openDelete(index) {
@@ -458,7 +469,7 @@ Panel {
     open: root.opened
     focusTarget: keyHandler
     contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(560))
+    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(820))
 
     Item {
       id: keyHandler
@@ -794,6 +805,69 @@ Panel {
                   onClicked: {
                     var svc = root.resolveService()
                     if (svc) svc.setFallbackProfile(modelData.name)
+                  }
+                }
+              }
+            }
+
+            PanelSeparator { foreground: root.bar.foreground }
+
+            SectionHeader {
+              iconGlyph: "󰏗"
+              title: "VERSION"
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+
+              Text {
+                width: parent.width
+                textFormat: Text.PlainText
+                text: "Sound Switcher " + (root.pluginVersion || "?")
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              Text {
+                width: parent.width
+                textFormat: Text.PlainText
+                text: "To update, copy this command, run it in a terminal, then restart the shell to load it."
+                color: Qt.darker(root.bar.foreground, 1.4)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.WordWrap
+              }
+
+              BorderSurface {
+                width: parent.width
+                implicitHeight: copyCommand.implicitHeight + Style.space(16)
+                radius: Style.cornerRadius
+                color: Util.alpha(root.bar.foreground, copyArea.containsMouse ? 0.12 : 0.06)
+
+                Text {
+                  id: copyCommand
+                  anchors.fill: parent
+                  anchors.margins: Style.space(8)
+                  textFormat: Text.PlainText
+                  text: root.updateCopied ? "Copied!" : root.updateCommand
+                  color: root.bar.foreground
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  elide: Text.ElideMiddle
+                  verticalAlignment: Text.AlignVCenter
+                }
+
+                MouseArea {
+                  id: copyArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    Quickshell.clipboardText = root.updateCommand
+                    root.updateCopied = true
+                    copiedResetTimer.restart()
                   }
                 }
               }
